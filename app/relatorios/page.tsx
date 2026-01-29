@@ -9,6 +9,7 @@ import {
   getCurrentPhase,
   getPhaseName,
   getCheckInStreak,
+  getSovereigntyIndex,
   getStatusLabel,
   formatDate,
 } from '@/lib/utils';
@@ -79,6 +80,14 @@ function PrintHeader({
         {company && <span>Empresa: {company}</span>}
         <span>Data: {new Date().toLocaleDateString('pt-BR')}</span>
       </div>
+    </div>
+  );
+}
+
+function SectionDivider({ title }: { title: string }) {
+  return (
+    <div className="border-t-2 border-zinc-700 pt-6 mt-10 print:border-gray-400 print:break-before-page">
+      <h2 className="text-xl font-bold text-white print:text-gray-900">{title}</h2>
     </div>
   );
 }
@@ -172,45 +181,71 @@ function GeralReport({
 }) {
   const progress = calculateOverallProgress(data);
   const phase = getCurrentPhase(data);
+  const sovereignty = getSovereigntyIndex(data);
   const streak = getCheckInStreak(data);
   const completedGestao = data.modules.filter((m) => m.status === 'completed').length;
   const completedComport = (data.behaviorModules || []).filter((m) => m.status === 'completed').length;
   const completedDesafios = data.challenges.filter((c) => c.status === 'completed').length;
   const completedProjetos = data.projects.filter((p) => p.status === 'completed').length;
 
-  const activeModules = data.modules.filter((m) => m.status !== 'pending');
-  const activeBehaviors = (data.behaviorModules || []).filter((m) => m.status !== 'pending');
-  const completedChallenges = data.challenges.filter((c) => c.status === 'completed');
-  const completedProjects = data.projects.filter((p) => p.status === 'completed');
+  const phases = [1, 2, 3, 4] as const;
+
+  // Network categories
+  const categories = Array.from(new Set(data.contacts.map((c) => c.category))).sort();
+
+  // Challenge groups
+  const challengeGroups = [
+    { label: 'Concluidos', status: 'completed', items: data.challenges.filter((c) => c.status === 'completed') },
+    { label: 'Em Progresso', status: 'in_progress', items: data.challenges.filter((c) => c.status === 'in_progress') },
+    { label: 'A Fazer', status: 'pending', items: data.challenges.filter((c) => c.status === 'pending') },
+  ];
+
+  // Project groups
+  const projectGroups = [
+    { label: 'Concluidos', status: 'completed', items: data.projects.filter((p) => p.status === 'completed') },
+    { label: 'Em Progresso', status: 'in_progress', items: data.projects.filter((p) => p.status === 'in_progress') },
+    { label: 'A Fazer', status: 'pending', items: data.projects.filter((p) => p.status === 'pending') },
+  ];
+
+  // Check-ins grouped by date
+  const checkInsByDate: Record<string, typeof data.checkIns> = {};
+  for (const ci of data.checkIns) {
+    if (!checkInsByDate[ci.date]) checkInsByDate[ci.date] = [];
+    checkInsByDate[ci.date].push(ci);
+  }
+  const sortedCheckInDates = Object.keys(checkInsByDate).sort().reverse();
+
+  const periodLabels: Record<string, string> = {
+    '7h': 'Manha (7h)',
+    '13h': 'Tarde (13h)',
+    '20h': 'Noite (20h)',
+  };
 
   return (
     <div className="space-y-8">
-      <PrintHeader title="Relatorio Geral" menteeName={menteeName} company={company} />
+      {/* 1. Cabecalho */}
+      <PrintHeader title="Relatorio Final — Jornada Protagonista" menteeName={menteeName} company={company} />
 
-      {/* Header info (screen only) */}
       <div className="print:hidden">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-zinc-400">Mentorado</span>
-            <span className="text-sm text-zinc-400">
-              {new Date().toLocaleDateString('pt-BR')}
-            </span>
+            <span className="text-sm text-zinc-400">Relatorio Final — Jornada Protagonista</span>
+            <span className="text-sm text-zinc-400">{new Date().toLocaleDateString('pt-BR')}</span>
           </div>
           <h2 className="text-xl font-bold text-white">{menteeName}</h2>
           {company && <p className="text-sm text-zinc-500">{company}</p>}
         </div>
       </div>
 
-      {/* Progress & Phase */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 2. Resumo Executivo */}
+      <SectionDivider title="Resumo Executivo" />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 print:border-gray-300 print:bg-white">
           <span className="text-sm text-zinc-400 print:text-gray-500">Progresso Geral</span>
           <p className="text-3xl font-bold text-white mt-1 print:text-gray-900">{progress}%</p>
           <div className="w-full bg-zinc-800 rounded-full h-2 mt-3 print:bg-gray-200">
-            <div
-              className="bg-blue-500 h-2 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 print:border-gray-300 print:bg-white">
@@ -218,9 +253,15 @@ function GeralReport({
           <p className="text-3xl font-bold text-white mt-1 print:text-gray-900">Fase {phase}</p>
           <p className="text-sm text-zinc-500 mt-1 print:text-gray-500">{getPhaseName(phase)}</p>
         </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 print:border-gray-300 print:bg-white">
+          <span className="text-sm text-zinc-400 print:text-gray-500">Indice de Soberania</span>
+          <p className="text-3xl font-bold text-white mt-1 print:text-gray-900">{sovereignty}%</p>
+          <div className="w-full bg-zinc-800 rounded-full h-2 mt-3 print:bg-gray-200">
+            <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${sovereignty}%` }} />
+          </div>
+        </div>
       </div>
 
-      {/* Summary grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Gestao', value: completedGestao, color: 'text-blue-400 print:text-blue-700' },
@@ -238,7 +279,6 @@ function GeralReport({
         ))}
       </div>
 
-      {/* Metrics row */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-center print:border-gray-300 print:bg-white">
           <p className="text-sm text-zinc-400 print:text-gray-500">Check-ins</p>
@@ -254,107 +294,279 @@ function GeralReport({
         </div>
       </div>
 
-      {/* Modules in progress/completed */}
-      {activeModules.length > 0 && (
-        <div>
-          <SectionTitle>Modulos de Gestao</SectionTitle>
-          <div className="space-y-2">
-            {activeModules.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 print:border-gray-300 print:bg-white"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-500 print:text-gray-500 w-6">{m.id}.</span>
-                  <span className="text-sm text-zinc-200 print:text-gray-800">{m.name}</span>
-                </div>
-                <StatusBadge status={m.status} />
-              </div>
-            ))}
-          </div>
+      {/* 3. Metricas por Fase */}
+      <SectionDivider title="Metricas por Fase" />
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-700 print:border-gray-300">
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Fase</th>
+              <th className="text-center py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Gestao</th>
+              <th className="text-center py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Comportamentos</th>
+              <th className="text-center py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Desafios</th>
+            </tr>
+          </thead>
+          <tbody>
+            {phases.map((p) => {
+              const g = data.modules.filter((m) => m.phase === p && m.status === 'completed').length;
+              const b = (data.behaviorModules || []).filter((m) => m.phase === p && m.status === 'completed').length;
+              const d = data.challenges.filter((c) => c.phase === p && c.status === 'completed').length;
+              const gTotal = data.modules.filter((m) => m.phase === p).length;
+              const bTotal = (data.behaviorModules || []).filter((m) => m.phase === p).length;
+              const dTotal = data.challenges.filter((c) => c.phase === p).length;
+              return (
+                <tr key={p} className="border-b border-zinc-800 print:border-gray-200">
+                  <td className="py-2 px-3 text-zinc-200 font-medium print:text-gray-800">
+                    Fase {p} — {PHASE_NAMES[p]}
+                  </td>
+                  <td className="py-2 px-3 text-center text-zinc-300 print:text-gray-700">{g}/{gTotal}</td>
+                  <td className="py-2 px-3 text-center text-zinc-300 print:text-gray-700">{b}/{bTotal}</td>
+                  <td className="py-2 px-3 text-center text-zinc-300 print:text-gray-700">{d}/{dTotal}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 4. Gestao */}
+      <SectionDivider title="Gestao" />
+      <ModuleTable modules={data.modules} title="Modulos de Gestao" />
+
+      {/* 5. Comportamentos */}
+      <SectionDivider title="Comportamentos" />
+      <ModuleTable modules={data.behaviorModules || []} title="Modulos Comportamentais" />
+
+      {/* 6. Network */}
+      <SectionDivider title="Network" />
+      <SectionTitle>Contatos ({data.contacts.length})</SectionTitle>
+
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-3 mb-4">
+          {categories.map((cat) => (
+            <div
+              key={cat}
+              className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-1.5 print:border-gray-300 print:bg-white"
+            >
+              <span className="text-xs text-zinc-400 print:text-gray-500">{cat}: </span>
+              <span className="text-xs font-semibold text-white print:text-gray-900">
+                {data.contacts.filter((c) => c.category === cat).length}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
-      {activeBehaviors.length > 0 && (
-        <div>
-          <SectionTitle>Modulos Comportamentais</SectionTitle>
-          <div className="space-y-2">
-            {activeBehaviors.map((m) => (
-              <div
-                key={m.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2.5 print:border-gray-300 print:bg-white"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-500 print:text-gray-500 w-6">{m.id}.</span>
-                  <span className="text-sm text-zinc-200 print:text-gray-800">{m.name}</span>
-                </div>
-                <StatusBadge status={m.status} />
-              </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-700 print:border-gray-300">
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Nome</th>
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Cargo</th>
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Empresa</th>
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Categoria</th>
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Ultimo Contato</th>
+              <th className="text-left py-2 px-3 text-zinc-400 font-medium print:text-gray-600">Insights</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.contacts.map((c) => (
+              <tr key={c.id} className="border-b border-zinc-800 print:border-gray-200">
+                <td className="py-2 px-3 text-zinc-200 font-medium print:text-gray-800">{c.name}</td>
+                <td className="py-2 px-3 text-zinc-400 print:text-gray-600">{c.role}</td>
+                <td className="py-2 px-3 text-zinc-400 print:text-gray-600">{c.company}</td>
+                <td className="py-2 px-3 text-zinc-400 print:text-gray-600">{c.category}</td>
+                <td className="py-2 px-3 text-zinc-400 print:text-gray-600">
+                  {c.lastContact ? formatDate(c.lastContact) : '—'}
+                </td>
+                <td className="py-2 px-3 text-zinc-300 print:text-gray-700 max-w-xs truncate">
+                  {c.insights || '—'}
+                </td>
+              </tr>
             ))}
-          </div>
-        </div>
-      )}
+            {data.contacts.length === 0 && (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-zinc-500 print:text-gray-400">
+                  Nenhum contato registrado
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      {/* Completed challenges with evidence */}
-      {completedChallenges.length > 0 && (
-        <div>
-          <SectionTitle>Desafios Concluidos</SectionTitle>
-          <div className="space-y-3">
-            {completedChallenges.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 print:border-gray-300 print:bg-white"
-              >
-                <h4 className="text-sm font-medium text-white print:text-gray-900">{c.name}</h4>
-                <p className="text-xs text-zinc-500 print:text-gray-500">
-                  Fase {c.phase} — {PHASE_NAMES[c.phase]}
-                </p>
-                {c.evidence && (
-                  <div className="mt-2">
-                    <p className="text-xs text-zinc-500 print:text-gray-500">Evidencias:</p>
-                    <p className="text-sm text-zinc-300 whitespace-pre-wrap print:text-gray-700">
-                      {c.evidence}
-                    </p>
+      {/* 7. Desafios */}
+      <SectionDivider title="Desafios" />
+
+      {challengeGroups.map((group) => (
+        <div key={group.status} className="mb-6">
+          <SectionTitle>
+            {group.label} ({group.items.length})
+          </SectionTitle>
+          {group.items.length === 0 ? (
+            <p className="text-sm text-zinc-500 print:text-gray-400">Nenhum desafio nesta categoria</p>
+          ) : (
+            <div className="space-y-3">
+              {group.items.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 print:border-gray-300 print:bg-white"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-white print:text-gray-900">{c.name}</h4>
+                      <p className="text-xs text-zinc-500 print:text-gray-500">
+                        Fase {c.phase} — {PHASE_NAMES[c.phase]}
+                      </p>
+                    </div>
+                    <StatusBadge status={c.status} />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  {c.description && (
+                    <p className="text-sm text-zinc-400 mt-2 print:text-gray-600">{c.description}</p>
+                  )}
+                  {c.evidence && (
+                    <div className="mt-3 pl-3 border-l-2 border-emerald-700 print:border-emerald-400">
+                      <p className="text-xs font-medium text-zinc-400 print:text-gray-500">Evidencias</p>
+                      <p className="text-sm text-zinc-300 whitespace-pre-wrap print:text-gray-700">
+                        {c.evidence}
+                      </p>
+                    </div>
+                  )}
+                  {c.reflection && (
+                    <div className="mt-2 pl-3 border-l-2 border-blue-700 print:border-blue-400">
+                      <p className="text-xs font-medium text-zinc-400 print:text-gray-500">Reflexao</p>
+                      <p className="text-sm text-zinc-300 whitespace-pre-wrap print:text-gray-700">
+                        {c.reflection}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      ))}
 
-      {/* Completed projects with deliverables */}
-      {completedProjects.length > 0 && (
-        <div>
-          <SectionTitle>Projetos Concluidos</SectionTitle>
-          <div className="space-y-3">
-            {completedProjects.map((p) => (
-              <div
-                key={p.id}
-                className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 print:border-gray-300 print:bg-white"
-              >
-                <h4 className="text-sm font-medium text-white print:text-gray-900">{p.name}</h4>
-                <p className="text-xs text-zinc-500 print:text-gray-500">Mes {p.month}</p>
-                {p.deliverables.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {p.deliverables.map((d, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-2 text-sm text-zinc-300 print:text-gray-700"
-                      >
-                        {d.done ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 print:text-emerald-600 flex-shrink-0" />
-                        ) : (
-                          <Circle className="h-3.5 w-3.5 text-zinc-500 print:text-gray-400 flex-shrink-0" />
-                        )}
-                        {d.name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
+      {/* 8. Projetos */}
+      <SectionDivider title="Projetos" />
+
+      {projectGroups.map((group) => (
+        <div key={group.status} className="mb-6">
+          <SectionTitle>
+            {group.label} ({group.items.length})
+          </SectionTitle>
+          {group.items.length === 0 ? (
+            <p className="text-sm text-zinc-500 print:text-gray-400">Nenhum projeto nesta categoria</p>
+          ) : (
+            <div className="space-y-3">
+              {group.items.map((p) => {
+                const done = p.deliverables.filter((d) => d.done).length;
+                const total = p.deliverables.length;
+                return (
+                  <div
+                    key={p.id}
+                    className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 print:border-gray-300 print:bg-white"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium text-white print:text-gray-900">{p.name}</h4>
+                        <p className="text-xs text-zinc-500 print:text-gray-500">Mes {p.month}</p>
+                      </div>
+                      <StatusBadge status={p.status} />
+                    </div>
+
+                    {total > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs font-medium text-zinc-400 mb-1.5 print:text-gray-500">
+                          Entregaveis ({done}/{total})
+                        </p>
+                        <ul className="space-y-1">
+                          {p.deliverables.map((d, i) => (
+                            <li
+                              key={i}
+                              className="flex items-center gap-2 text-sm text-zinc-300 print:text-gray-700"
+                            >
+                              {d.done ? (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0 print:text-emerald-600" />
+                              ) : (
+                                <Circle className="h-3.5 w-3.5 text-zinc-500 flex-shrink-0 print:text-gray-400" />
+                              )}
+                              <span className={d.done ? '' : 'text-zinc-500 print:text-gray-400'}>
+                                {d.name}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {p.metrics && (
+                      <div className="mt-3 pl-3 border-l-2 border-zinc-700 print:border-gray-300">
+                        <p className="text-xs font-medium text-zinc-400 print:text-gray-500">Metricas</p>
+                        <p className="text-sm text-zinc-300 whitespace-pre-wrap print:text-gray-700">
+                          {p.metrics}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* 9. Check-ins */}
+      <SectionDivider title="Check-ins" />
+
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-center print:border-gray-300 print:bg-white">
+          <p className="text-sm text-zinc-400 print:text-gray-500">Total de Check-ins</p>
+          <p className="text-2xl font-bold text-white mt-1 print:text-gray-900">{data.checkIns.length}</p>
+        </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-center print:border-gray-300 print:bg-white">
+          <p className="text-sm text-zinc-400 print:text-gray-500">Streak Atual</p>
+          <p className="text-2xl font-bold text-white mt-1 print:text-gray-900">{streak} dias</p>
+        </div>
+      </div>
+
+      {sortedCheckInDates.length === 0 ? (
+        <p className="text-sm text-zinc-500 print:text-gray-400">Nenhum check-in registrado</p>
+      ) : (
+        <div className="space-y-4">
+          {sortedCheckInDates.map((date) => (
+            <div
+              key={date}
+              className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 print:border-gray-300 print:bg-white"
+            >
+              <h4 className="text-sm font-semibold text-white mb-3 print:text-gray-900">
+                {formatDate(date)}
+              </h4>
+              <div className="space-y-3">
+                {checkInsByDate[date]
+                  .sort((a, b) => {
+                    const order: Record<string, number> = { '7h': 0, '13h': 1, '20h': 2 };
+                    return (order[a.period] ?? 0) - (order[b.period] ?? 0);
+                  })
+                  .map((ci) => (
+                    <div key={ci.id} className="pl-3 border-l-2 border-zinc-700 print:border-gray-300">
+                      <p className="text-xs font-medium text-zinc-400 mb-1.5 print:text-gray-500">
+                        {periodLabels[ci.period] || ci.period}
+                      </p>
+                      <div className="space-y-1.5">
+                        {ci.responses.map((r, i) => (
+                          <div key={i}>
+                            <p className="text-xs text-zinc-500 print:text-gray-500">{r.question}</p>
+                            <p className="text-sm text-zinc-300 print:text-gray-700">{r.answer || '—'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

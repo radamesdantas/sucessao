@@ -35,3 +35,20 @@ body {
     border-radius: 3px;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: #111 !important;
+  }
+  aside {
+    display: none !important;
+  }
+  main {
+    margin-left: 0 !important;
+    padding: 1rem !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

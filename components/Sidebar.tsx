@@ -12,6 +12,7 @@ import {
   Trophy,
   FolderKanban,
   BarChart3,
+  FileText,
   GraduationCap,
   ArrowLeftRight,
   User,
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/network', label: 'Network', icon: Users },
   { href: '/desafios', label: 'Desafios', icon: Trophy },
   { href: '/projetos', label: 'Projetos', icon: FolderKanban },
+  { href: '/relatorios', label: 'Relatorios', icon: FileText },
   { href: '/metricas', label: 'Metricas', icon: BarChart3 },
 ];
 

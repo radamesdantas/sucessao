@@ -133,6 +133,49 @@ function ModuleTable({ modules, title }: { modules: Module[]; title: string }) {
         </table>
       </div>
 
+      {/* Tópicos das Semanas */}
+      <div className="space-y-4 mt-6">
+        <h4 className="text-sm font-semibold text-zinc-300 print:text-gray-700">
+          Topicos por Modulo
+        </h4>
+        {modules.map((m) => (
+          <div
+            key={m.id}
+            className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 print:border-gray-300 print:bg-white"
+          >
+            <h5 className="text-sm font-medium text-white mb-3 print:text-gray-900">
+              {m.id}. {m.name}
+            </h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {m.weeks.map((w) => (
+                <div
+                  key={w.week}
+                  className="flex items-start gap-2 p-2 rounded border border-zinc-800 print:border-gray-300"
+                >
+                  <div className="flex-shrink-0 mt-0.5">
+                    {w.status === 'completed' && (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 print:text-emerald-600" />
+                    )}
+                    {w.status === 'in_progress' && (
+                      <Clock className="h-4 w-4 text-amber-400 print:text-amber-600" />
+                    )}
+                    {w.status === 'pending' && (
+                      <Circle className="h-4 w-4 text-zinc-500 print:text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-zinc-400 print:text-gray-500">
+                      Semana {w.week}
+                    </p>
+                    <p className="text-sm text-zinc-200 print:text-gray-800">{w.title}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {modulesWithNotes.length > 0 && (
         <div className="space-y-4 mt-6">
           <h4 className="text-sm font-semibold text-zinc-300 print:text-gray-700">
